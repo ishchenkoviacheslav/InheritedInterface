@@ -52,41 +52,64 @@ namespace InheritedInterface
     }
     class MyMutex
     {
-        Task task = null;
-        Mutex mutex = null;
+        List<Task> tasks = new List<Task>();
+        Mutex mutex = new Mutex();
+        
         public async Task Lock()
         {
-            await (task = Task.Run(() =>
+            Task tempTask = null;
+            await (tempTask = Task.Run(() =>
                 {
-                    mutex = new Mutex();
                     mutex.WaitOne();
                     Console.WriteLine("start: {0}", Thread.CurrentThread.ManagedThreadId);
                 }));
+            tasks.Add(tempTask);
+            
         }
         public void Release()
         {
-            task.ContinueWith((t) => { mutex.ReleaseMutex(); Console.WriteLine("inside: {0}", Thread.CurrentThread.ManagedThreadId); });
+            // tasks.First().ContinueWith((t) => { mutex.ReleaseMutex(); });
+            while (true)
+            {
+                try
+                {
+                    foreach (Task t in tasks)
+                    {
+                        t.ContinueWith((o) => { mutex.ReleaseMutex(); Console.WriteLine("inside: {0} TaskID: {1}", Thread.CurrentThread.ManagedThreadId, o.Id.ToString()); });
+                        tasks.RemoveAll((o) => { return (o.Id == t.Id); });
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+            }
             //throw new MyMutexException("Only one of tasks, returned by Lock(), must become completed");
         }
     }
     class Program
     {
         static MyMutex mutexObj = new MyMutex();
-        //static int x = 0;
+        static int x = 0;
         static void Main(string[] args)
         {
             Console.WriteLine("main: {0}", Thread.CurrentThread.ManagedThreadId);
 
-            Thread newThread = new Thread(new ThreadStart(async()=> 
+            for (int i = 0; i < 5; i++)
             {
-                await mutexObj.Lock();
-                Console.WriteLine("asdf");
-                mutexObj.Release();
-            }));
-            newThread.Start();
-            
-         
-            
+                Thread newThread = new Thread(new ThreadStart(async () =>
+                {
+                    await mutexObj.Lock();
+                    Console.WriteLine("asdf");
+                    mutexObj.Release();
+                }));
+                newThread.Start();
+
+            }
+
+
+
             //MyClass2 cl2 = new MyClass3();
             //cl2.fu();
             //Console.WriteLine(cl2.GetType().ToString());
@@ -134,10 +157,10 @@ namespace InheritedInterface
             //   task1.Start();
             //   task4.Wait();
             //****************************************************************
-            //for (int i = 0; i < 5; i++)
+            //for (int i = 0; i < 50; i++)
             //{
             //    Thread myThread = new Thread(Count);
-            //    myThread.Name = "Thread " + i.ToString();
+            //    myThread.Name = "Thread ";// + i.ToString();
             //    myThread.Start();
             //}
 
@@ -149,17 +172,17 @@ namespace InheritedInterface
         //    Console.WriteLine("Id of Task befor: {0}", t.Id);
         //    Thread.Sleep(3000);
         //}
-        //public static async void Count()
-        //{
-        //    await mutexObj.Lock();
-        //    x = 1;
-        //    for (int i = 1; i < 9; i++)
-        //    {
-        //        Console.WriteLine("{0}: {1}", Thread.CurrentThread.Name, x);
-        //        x++;
-        //        Thread.Sleep(100);
-        //    }
-        //    mutexObj.Release();
-        //}
+        public static async void Count()
+        {
+            await mutexObj.Lock();
+            x = 1;
+            for (int i = 1; i < 9; i++)
+            {
+                Console.WriteLine("{0}: {1}", Thread.CurrentThread.Name, x);
+                x++;
+                Thread.Sleep(100);
+            }
+            mutexObj.Release();
+        }
     }
 }
