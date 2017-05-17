@@ -52,53 +52,41 @@ namespace InheritedInterface
     }
     class MyMutex
     {
+        Task task = null;
         Mutex mutex = null;
-        bool Locked = false;
-        Action act;
         public async Task Lock()
         {
-        await Task.Run(() =>
-            {
-                mutex = new Mutex();
-                mutex.WaitOne();
-                //act = () => { mutex.ReleaseMutex(); };
-                Locked = true;
-                Thread.CurrentThread.Name = "MyThread";
-            });
-            //returnedTask = new Task(() =>
-            //{
-
-            //    thread = new Thread(new ThreadStart(() =>
-            //    {
-            //        mutex.WaitOne();
-            //    }));
-            //    thread.Name = "myThread";
-            //    thread.Start();
-            //});
-            //returnedTask.Start();
-            //await returnedTask;
+            await (task = Task.Run(() =>
+                {
+                    mutex = new Mutex();
+                    mutex.WaitOne();
+                    Console.WriteLine("start: {0}", Thread.CurrentThread.ManagedThreadId);
+                }));
         }
         public void Release()
         {
-            if (Locked)
-            {
-                act();
-                Locked = false;
-            }
-            else
-            {
-                Locked = false;
-                throw new MyMutexException("Only one of tasks, returned by Lock(), must become completed");
-            }
+            task.ContinueWith((t) => { mutex.ReleaseMutex(); Console.WriteLine("inside: {0}", Thread.CurrentThread.ManagedThreadId); });
+            //throw new MyMutexException("Only one of tasks, returned by Lock(), must become completed");
         }
     }
     class Program
     {
         static MyMutex mutexObj = new MyMutex();
-        static int x = 0;
+        //static int x = 0;
         static void Main(string[] args)
         {
+            Console.WriteLine("main: {0}", Thread.CurrentThread.ManagedThreadId);
 
+            Thread newThread = new Thread(new ThreadStart(async()=> 
+            {
+                await mutexObj.Lock();
+                Console.WriteLine("asdf");
+                mutexObj.Release();
+            }));
+            newThread.Start();
+            
+         
+            
             //MyClass2 cl2 = new MyClass3();
             //cl2.fu();
             //Console.WriteLine(cl2.GetType().ToString());
@@ -146,12 +134,12 @@ namespace InheritedInterface
             //   task1.Start();
             //   task4.Wait();
             //****************************************************************
-            for (int i = 0; i < 5; i++)
-            {
-                Thread myThread = new Thread(Count);
-                myThread.Name = "Thread " + i.ToString();
-                myThread.Start();
-            }
+            //for (int i = 0; i < 5; i++)
+            //{
+            //    Thread myThread = new Thread(Count);
+            //    myThread.Name = "Thread " + i.ToString();
+            //    myThread.Start();
+            //}
 
             Console.ReadLine();
         }
@@ -161,17 +149,17 @@ namespace InheritedInterface
         //    Console.WriteLine("Id of Task befor: {0}", t.Id);
         //    Thread.Sleep(3000);
         //}
-        public static async void Count()
-        {
-            await mutexObj.Lock();
-            x = 1;
-            for (int i = 1; i < 9; i++)
-            {
-                Console.WriteLine("{0}: {1}", Thread.CurrentThread.Name, x);
-                x++;
-                Thread.Sleep(100);
-            }
-            mutexObj.Release();
-        }
+        //public static async void Count()
+        //{
+        //    await mutexObj.Lock();
+        //    x = 1;
+        //    for (int i = 1; i < 9; i++)
+        //    {
+        //        Console.WriteLine("{0}: {1}", Thread.CurrentThread.Name, x);
+        //        x++;
+        //        Thread.Sleep(100);
+        //    }
+        //    mutexObj.Release();
+        //}
     }
 }
